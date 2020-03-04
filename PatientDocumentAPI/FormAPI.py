@@ -1,9 +1,11 @@
+from azure.common import AzureMissingResourceHttpError
 from flask import Flask, abort, make_response, jsonify
 from flask_restful import Api, Resource, reqparse
 from fhir_parser.fhir import FHIR
-from GenerateDocuments import FeedbackForm, PatientDataForm
+from GenerateDocuments import FeedbackForm, PatientHealthForm, PatientDataForm
 from AzureBlobStorage import *
 import os
+import json
 
 app = Flask(__name__)
 api = Api(app)
@@ -64,14 +66,14 @@ def get_patient_data(observations, vital_sign):
             continue
         for component in observation.components:
             if component.display == vital_sign:
-                date.append(observation.issued_datatime)
+                date.append(observation.issued_datetime)
                 value.append(component.value)
                 unit = component.unit
 
     return date, value, unit
 
 
-class AskForFeedback(Resource):
+class GenerateFeedbackReport(Resource):
     """
     Class used to create a word document on an azure account asking for a specific patient for feedback.
     """
@@ -79,7 +81,7 @@ class AskForFeedback(Resource):
     def __init__(self):
         self.reqparse = reqparse.RequestParser()
         self.reqparse.add_argument('id', type=str)
-        super(AskForFeedback, self).__init__()
+        super(GenerateFeedbackReport, self).__init__()
 
     def get(self):
         """
@@ -98,20 +100,21 @@ class AskForFeedback(Resource):
         feedback_form = FeedbackForm(args['id'], feedback_data)
         feedback_form.generate_feedback_form()
 
-        write_data_to_azure(args['id'] + " feedback request.docx", "feedbackforms")
+        write_data_to_azure(args['id'] + " feedback request.docx", storage_account_name, storage_account_key, feedback_container_name)
         os.remove(args['id'] + " feedback request.docx")
 
         return make_response(generate_feedback_data(patient), 200)
 
 
-class GetDocumentData(Resource):
+class GenerateFeedbackReportData(Resource):
     """
     Class used to generate required data and questions needed to create a feedback form for a specific patient
     """
+
     def __init__(self):
         self.reqparse = reqparse.RequestParser()
         self.reqparse.add_argument('id', type=str)
-        super(GetDocumentData, self).__init__()
+        super(GenerateFeedbackReportData, self).__init__()
 
     def get(self):
         """
@@ -150,20 +153,21 @@ class GeneratePatientReport(Resource):
         fhir_parser = FHIR('https://localhost:5001/api/', verify_ssl=False)
         patient = fhir_parser.get_patient(args['id'])
         observations = fhir_parser.get_patient_observations(args['id'])
-        vital_signs = ['Body Weight', 'Heart rate', 'Respiratory rate', 'Body Mass Index']
+        vital_signs = ['Body Weight', 'Heart rate', 'Respiratory rate', 'Body Mass Index', 'Diastolic Blood Pressure',
+                       'Systolic Blood Pressure']
 
         for vital_sign in vital_signs:
             value_dates, values, unit = get_patient_data(observations, vital_sign)
             dates = [str(date) for date in value_dates]
             patient_data[vital_sign] = {"Dates": dates, "Values": values, 'Unit': unit}
 
-        patient_data_document = PatientDataForm(args['id'], patient.full_name(), patient_data)
+        patient_data_document = PatientHealthForm(args['id'], patient.full_name(), patient_data)
         patient_data_document.generate_patient_data_form()
 
-        write_data_to_azure(args['id'] + " health data.docx", "patienthealthdata")
+        write_data_to_azure(args['id'] + " health data.docx", storage_account_name, storage_account_key, health_data_container_name)
         os.remove(args['id'] + " health data.docx")
 
-        return patient_data
+        return make_response(patient_data, 200)
 
 
 class GeneratePatientReportData(Resource):
@@ -171,6 +175,7 @@ class GeneratePatientReportData(Resource):
     Class used to collect all the dates and values for patient health data in regards to Weight, BMI, Heart rate,
     Respiratory rate.
     """
+
     def __init__(self):
         self.reqparse = reqparse.RequestParser()
         self.reqparse.add_argument('id', type=str)
@@ -187,7 +192,8 @@ class GeneratePatientReportData(Resource):
 
         fhir_parser = FHIR('https://localhost:5001/api/', verify_ssl=False)
         observations = fhir_parser.get_patient_observations(args['id'])
-        vital_signs = ['Body Weight', 'Heart rate', 'Respiratory rate', 'Body Mass Index']
+        vital_signs = ['Body Weight', 'Heart rate', 'Respiratory rate', 'Body Mass Index', 'Diastolic Blood Pressure',
+                       'Systolic Blood Pressure']
         patient_data = {}
 
         for vital_sign in vital_signs:
@@ -195,13 +201,56 @@ class GeneratePatientReportData(Resource):
             dates = [str(date) for date in dates]
             patient_data[vital_sign] = {"Dates": dates, "Values": values, 'Unit': unit}
 
-        return patient_data
+        return make_response(patient_data, 200)
 
 
-api.add_resource(AskForFeedback, '/FormFiller/feedback', endpoint='feedback')
-api.add_resource(GetDocumentData, '/FormFiller/feedbackDocumentData', endpoint='feedbackDocumentData')
+class GeneratePatientInformation(Resource):
+    """
+    Class used to create a word document asking patient to check and update all personal details held on them.
+    """
+
+    def __init__(self):
+        self.reqparse = reqparse.RequestParser()
+        self.reqparse.add_argument('id', type=str)
+        super(GeneratePatientInformation, self).__init__()
+
+    def get(self):
+        """
+        The GET response for the endpoint is JSON containing a message as to whether or not the document was
+        successfully created and stored on Azure
+        """
+        args = self.reqparse.parse_args()
+        if args['id'] is None:
+            abort(400)
+
+        fhir_parser = FHIR('https://localhost:5001/api/', verify_ssl=False)
+        patient = fhir_parser.get_patient(args['id'])
+
+        patient_data_form = PatientDataForm(patient)
+        patient_data_form.generate_patient_info_form()
+
+        write_data_to_azure(args['id'] + " details.docx", storage_account_name, storage_account_key,
+                            patient_info_container_name)
+        os.remove(args['id'] + " details.docx")
+
+        return make_response(jsonify({'message': 'Document created successfully'}, 200))
+
+
+# declares the routing for each endpoint
+api.add_resource(GenerateFeedbackReport, '/FormFiller/feedback', endpoint='feedback')
+api.add_resource(GenerateFeedbackReportData, '/FormFiller/feedbackDocumentData', endpoint='feedbackDocumentData')
 api.add_resource(GeneratePatientReport, '/report/patientReport', endpoint='report')
 api.add_resource(GeneratePatientReportData, '/report/rawData', endpoint='reportData')
+api.add_resource(GeneratePatientInformation, '/info/infoDocument', endpoint='patientInfo')
+
+# loads the details for the azure storage account from the config file.
+with open('config.json') as config_file:
+    data = json.load(config_file)
+    storage_account_name = data["account_name"]
+    storage_account_key = data["account_key"]
+    feedback_container_name = data["feedback_container_name"]
+    health_data_container_name = data["health_data_container_name"]
+    patient_info_container_name = data['patient_info_container_name']
 
 if __name__ == '__main__':
     app.run(debug=True, port=5010)

@@ -104,7 +104,7 @@ class FeedbackForm():
         answer_box.style = self.doc.styles['Table Grid']
 
 
-class PatientDataForm():
+class PatientHealthForm():
 
     def __init__(self, patient_id, name, patient_data):
         self.doc = docx.Document()
@@ -120,12 +120,13 @@ class PatientDataForm():
         self.doc.add_paragraph('Patient Health Data', 'Title')
         self.doc.add_paragraph("Name: " + self.name)
         self.doc.add_paragraph("ID: " + self.patient_id)
+        self.doc.add_paragraph("This document contains graphs detailing changes in the patients vital signs over time\n")
 
         for data_type in self.patient_data.keys():
             dates = self.patient_data[data_type]['Dates']
             values = self.patient_data[data_type]['Values']
             unit = self.patient_data[data_type]['Unit']
-            dates =[parse(date) for date in dates]
+            dates = [parse(date) for date in dates]
 
             memfile = BytesIO()
             plt.figure()
@@ -134,8 +135,62 @@ class PatientDataForm():
             plt.ylabel(unit)
             plt.title(data_type)
             plt.savefig(memfile)
-            self.doc.add_picture(memfile, height=Inches(3.5))
+            self.doc.add_paragraph(data_type + " over time").runs[0].bold = True
+            self.doc.add_picture(memfile, height=Inches(3))
 
         self.doc.save(self.patient_id + " health data.docx")
 
 
+class PatientDataForm():
+
+    def __init__(self, patient):
+        self.doc = docx.Document()
+        self.patient = patient
+
+    def generate_patient_info_form(self):
+        """
+        Creates a word document with all of the patients personal information and asks them to check the details.
+        Provides lines below the details for the patients to update the data if any of it is wrong or out of date.
+        """
+        para_1 = self.doc.add_paragraph('Patient Details', 'Title')
+        para_2 = self.doc.add_paragraph("This document contains the personal information pertaining to " + self.patient.full_name())
+        para_2.add_run("\nIf any details are incorrect or out of date please write the correct value on the line below "
+                       "the detail")
+        para_3 = self.doc.add_paragraph("ID: " + self.patient.uuid)
+        add_response_line(para_3, 0)
+        para_4 = self.doc.add_paragraph("First Name: " + self.patient.name.given)
+        add_response_line(para_4, 0)
+        para_5 = self.doc.add_paragraph("Surname Name: " + self.patient.name.family)
+        add_response_line(para_5, 0)
+        para_6 = self.doc.add_paragraph("Prefix: " + self.patient.name.prefix)
+        add_response_line(para_6, 0)
+        para_7 = self.doc.add_paragraph("First Name: " + self.patient.name.given)
+        add_response_line(para_7, 0)
+        para_8 = self.doc.add_paragraph("Gender: " + self.patient.gender)
+        add_response_line(para_8, 0)
+        para_9 = self.doc.add_paragraph("Date of birth: " + str(self.patient.birth_date))
+        add_response_line(para_9, 0)
+        para_10 = self.doc.add_paragraph("Address: " + self.patient.addresses[0].lines[0])
+        add_response_line(para_10, 0)
+        para_11 = self.doc.add_paragraph("City: " + self.patient.addresses[0].city)
+        add_response_line(para_11, 0)
+        para_12 = self.doc.add_paragraph("State: " + self.patient.addresses[0].state)
+        add_response_line(para_12, 0)
+        para_13 = self.doc.add_paragraph("Postal Code: " + self.patient.addresses[0].postal_code)
+        add_response_line(para_13, 0)
+        para_14 = self.doc.add_paragraph("Country: " + self.patient.addresses[0].country)
+        add_response_line(para_14, 0)
+        para_15 = self.doc.add_paragraph("Marital Status: " + str(self.patient.marital_status))
+        add_response_line(para_15, 0)
+        para_16 = self.doc.add_paragraph("Main language: " + self.patient.communications.languages[0])
+        add_response_line(para_16, 0)
+        para_17 = self.doc.add_paragraph("Driving License Number: " + self.patient.get_identifier('DL'))
+        add_response_line(para_17, 0)
+        para_18 = self.doc.add_paragraph("Social Security Number: " + self.patient.get_identifier("SS"))
+        add_response_line(para_18, 0)
+        self.doc.save(self.patient.uuid + " details.docx")
+
+
+
+
+# 8f789d0b-3145-4cf2-8504-13159edaa747

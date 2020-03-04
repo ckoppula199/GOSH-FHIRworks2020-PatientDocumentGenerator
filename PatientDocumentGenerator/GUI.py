@@ -2,14 +2,10 @@ from tkinter import *
 import threading
 import time
 import requests
+import json
 
 from azure.common import AzureMissingResourceHttpError
 from azure.storage.blob import BlockBlobService
-
-storage_account_key = 'storage_account_key'
-storage_account_name = 'storage_account_name'
-#Example patient ID
-#8f789d0b-3145-4cf2-8504-13159edaa747
 
 
 def get_feedback_document():
@@ -17,7 +13,7 @@ def get_feedback_document():
         file_name = patient_id.get() + " feedback request.docx"
         blob_service = BlockBlobService(account_name=storage_account_name, account_key=storage_account_key)
         try:
-            blob_service.get_blob_to_path("feedbackforms",
+            blob_service.get_blob_to_path(feedback_container_name,
                                           file_name,
                                           file_name)
         except AzureMissingResourceHttpError:
@@ -50,7 +46,7 @@ def get_health_document():
         file_name = patient_id.get() + " health data.docx"
         blob_service = BlockBlobService(account_name=storage_account_name, account_key=storage_account_key)
         try:
-            blob_service.get_blob_to_path("patienthealthdata",
+            blob_service.get_blob_to_path(health_data_container_name,
                                           file_name,
                                           file_name)
         except AzureMissingResourceHttpError:
@@ -78,6 +74,48 @@ def make_health_document():
     t.start()
 
 
+def get_patient_details_document():
+    def get_patient_details_form():
+        file_name = patient_id.get() + " details.docx"
+        blob_service = BlockBlobService(account_name=storage_account_name, account_key=storage_account_key)
+        try:
+            blob_service.get_blob_to_path(patient_info_container_name,
+                                          file_name,
+                                          file_name)
+        except AzureMissingResourceHttpError:
+            information.set("File does not exist on Azure")
+            time.sleep(1)
+            information.set("Enter Patient ID")
+
+    t = threading.Thread(target=get_patient_details_form)
+    t.start()
+
+
+def make_patient_details_document():
+    def make_patient_details_form():
+        response = requests.get("http://localhost:5010/info/infoDocument?id=" + patient_id.get())
+        if response.status_code == 200:
+            information.set("Document created on Azure")
+            time.sleep(1)
+            information.set("Enter Patient ID")
+        else:
+            information.set("File could not be created")
+            time.sleep(1)
+            information.set("Enter Patient ID")
+
+    t = threading.Thread(target=make_patient_details_form)
+    t.start()
+
+
+with open('config.json') as config_file:
+    data = json.load(config_file)
+    storage_account_name = data["account_name"]
+    storage_account_key = data["account_key"]
+    feedback_container_name = data["feedback_container_name"]
+    health_data_container_name = data["health_data_container_name"]
+    patient_info_container_name = data['patient_info_container_name']
+
+
 window = Tk()
 window.wm_title("Patient Document Generator")
 
@@ -103,5 +141,12 @@ health_form_button.grid(row=3, column=0)
 generate_health_form_button = Button(window, text="Generate Health Data Form", width=45, command=make_health_document,
                                      height=2)
 generate_health_form_button.grid(row=3, column=1)
+
+patient_info_button = Button(window, text="Get Patient Details Form", width=45, command=get_patient_details_document, height=2)
+patient_info_button.grid(row=4, column=0)
+
+generate_patient_info_button = Button(window, text="Generate Patient Details Form", width=45, command=make_patient_details_document,
+                                     height=2)
+generate_patient_info_button.grid(row=4, column=1)
 
 window.mainloop()
