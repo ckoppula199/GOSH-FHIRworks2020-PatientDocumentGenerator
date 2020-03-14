@@ -93,7 +93,10 @@ class GenerateFeedbackReport(Resource):
             abort(400)
 
         fhir_parser = FHIR('https://localhost:5001/api/', verify_ssl=False)
-        patient = fhir_parser.get_patient(args['id'])
+        try:
+            patient = fhir_parser.get_patient(args['id'])
+        except ConnectionError:
+            return make_response(jsonify({'message': 'Patient Does Not Exist'}), 404)
 
         feedback_data = generate_feedback_data(patient)
 
@@ -126,7 +129,10 @@ class GenerateFeedbackReportData(Resource):
             abort(400)
 
         fhir_parser = FHIR('https://localhost:5001/api/', verify_ssl=False)
-        patient = fhir_parser.get_patient(args['id'])
+        try:
+            patient = fhir_parser.get_patient(args['id'])
+        except ConnectionError:
+            return make_response(jsonify({'message': 'Patient Does Not Exist'}), 404)
 
         return make_response(generate_feedback_data(patient), 200)
 
@@ -140,9 +146,9 @@ class GeneratePatientReport(Resource):
     def get(self):
         """
         The GET response for this endpoint not only returns JSON containing information on the readings and dates of
-        those readings for patient health data regarding weight, heart rate, BMI and respiratory rate,
-        but also creates a word document containing visualisations of the data and saves it to an Azure storage
-        account.
+        those readings for patient health data regarding weight, heart rate, BMI , diastolic blood pressure,
+        systolic blood pressure and respiratory rate, but also creates a word document containing visualisations of
+        the data and saves it to an Azure storage account.
         """
         args = self.reqparse.parse_args()
         if args['id'] is None:
@@ -151,7 +157,10 @@ class GeneratePatientReport(Resource):
         patient_data = {}
 
         fhir_parser = FHIR('https://localhost:5001/api/', verify_ssl=False)
-        patient = fhir_parser.get_patient(args['id'])
+        try:
+            patient = fhir_parser.get_patient(args['id'])
+        except ConnectionError:
+            return make_response(jsonify({'message': 'Patient Does Not Exist'}), 404)
         observations = fhir_parser.get_patient_observations(args['id'])
         vital_signs = ['Body Weight', 'Heart rate', 'Respiratory rate', 'Body Mass Index', 'Diastolic Blood Pressure',
                        'Systolic Blood Pressure']
@@ -184,14 +193,19 @@ class GeneratePatientReportData(Resource):
     def get(self):
         """
         The GET response for the endpoint is JSON containing information on the readings and dates of those readings
-        for patient health data regarding weight, heart rate, BMI and respiratory rate.
+        for patient health data regarding weight, heart rate, BMI , diastolic blood pressure, systolic blood pressure
+        and respiratory rate.
         """
         args = self.reqparse.parse_args()
         if args['id'] is None:
             abort(400)
 
         fhir_parser = FHIR('https://localhost:5001/api/', verify_ssl=False)
-        observations = fhir_parser.get_patient_observations(args['id'])
+        try:
+            observations = fhir_parser.get_patient_observations(args['id'])
+        except ConnectionError:
+            return make_response(jsonify({'message': 'Patient Does Not Exist'}), 404)
+
         vital_signs = ['Body Weight', 'Heart rate', 'Respiratory rate', 'Body Mass Index', 'Diastolic Blood Pressure',
                        'Systolic Blood Pressure']
         patient_data = {}
@@ -224,7 +238,10 @@ class GeneratePatientInformation(Resource):
             abort(400)
 
         fhir_parser = FHIR('https://localhost:5001/api/', verify_ssl=False)
-        patient = fhir_parser.get_patient(args['id'])
+        try:
+            patient = fhir_parser.get_patient(args['id'])
+        except ConnectionError:
+            return make_response(jsonify({'message': 'Patient Does Not Exist'}), 404)
 
         patient_data_form = PatientDataForm(patient)
         patient_data_form.generate_patient_info_form()

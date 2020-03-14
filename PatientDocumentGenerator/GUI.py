@@ -3,6 +3,7 @@ import threading
 import time
 import requests
 import json
+import os
 
 from azure.common import AzureMissingResourceHttpError
 from azure.storage.blob import BlockBlobService
@@ -20,6 +21,7 @@ def get_feedback_document():
             information.set("File does not exist on Azure")
             time.sleep(1)
             information.set("Enter Patient ID")
+            os.remove(file_name)
 
     t = threading.Thread(target=get_feedback_form)
     t.start()
@@ -30,6 +32,10 @@ def make_feedback_document():
         response = requests.get("http://localhost:5010/FormFiller/feedback?id=" + patient_id.get())
         if response.status_code == 200:
             information.set("Document created on Azure")
+            time.sleep(1)
+            information.set("Enter Patient ID")
+        elif response.status_code == 404:
+            information.set("Patient does not exist")
             time.sleep(1)
             information.set("Enter Patient ID")
         else:
@@ -53,6 +59,7 @@ def get_health_document():
             information.set("File does not exist on Azure")
             time.sleep(1)
             information.set("Enter Patient ID")
+            os.remove(file_name)
 
     t = threading.Thread(target=get_health_form)
     t.start()
@@ -63,6 +70,10 @@ def make_health_document():
         response = requests.get("http://localhost:5010/report/patientReport?id=" + patient_id.get())
         if response.status_code == 200:
             information.set("Document created on Azure")
+            time.sleep(1)
+            information.set("Enter Patient ID")
+        elif response.status_code == 404:
+            information.set("Patient does not exist")
             time.sleep(1)
             information.set("Enter Patient ID")
         else:
@@ -86,6 +97,7 @@ def get_patient_details_document():
             information.set("File does not exist on Azure")
             time.sleep(1)
             information.set("Enter Patient ID")
+            os.remove(file_name)
 
     t = threading.Thread(target=get_patient_details_form)
     t.start()
@@ -96,6 +108,10 @@ def make_patient_details_document():
         response = requests.get("http://localhost:5010/info/infoDocument?id=" + patient_id.get())
         if response.status_code == 200:
             information.set("Document created on Azure")
+            time.sleep(1)
+            information.set("Enter Patient ID")
+        elif response.status_code == 404:
+            information.set("Patient does not exist")
             time.sleep(1)
             information.set("Enter Patient ID")
         else:
